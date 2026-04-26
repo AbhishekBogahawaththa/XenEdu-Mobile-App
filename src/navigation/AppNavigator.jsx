@@ -13,17 +13,17 @@ import StudentClasses from '../screens/student/StudentClasses';
 import StudentAITutor from '../screens/student/StudentAITutor';
 import StudentProfile from '../screens/student/StudentProfile';
 import StudentQRCode from '../screens/student/StudentQRCode';
+import StudentAttendance from '../screens/student/StudentAttendance';
+import StudentNotifications from '../screens/student/StudentNotifications';
 import TeacherDashboard from '../screens/teacher/TeacherDashboard';
 import TeacherAttendance from '../screens/teacher/TeacherAttendance';
-import ParentDashboard from '../screens/parent/ParentDashboard';
-import StudentAttendance from '../screens/student/StudentAttendance';
 import TeacherCourseWork from '../screens/teacher/TeacherCourseWork';
+import ParentDashboard from '../screens/parent/ParentDashboard';
 import AdminDashboard from '../screens/admin/AdminDashboard';
 import AdminStudents from '../screens/admin/AdminStudents';
 import AdminFees from '../screens/admin/AdminFees';
 import AdminClasses from '../screens/admin/AdminClasses';
 import AdminReports from '../screens/admin/AdminReports';
-
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,6 +51,7 @@ const StudentTabs = () => (
         else if (route.name === 'My ID') iconName = focused ? 'qr-code' : 'qr-code-outline';
         else if (route.name === 'Attendance') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
         else if (route.name === 'AI Tutor') iconName = focused ? 'sparkles' : 'sparkles-outline';
+        else if (route.name === 'Alerts') iconName = focused ? 'notifications' : 'notifications-outline';
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
@@ -61,12 +62,12 @@ const StudentTabs = () => (
     <Tab.Screen name="My ID" component={StudentQRCode} />
     <Tab.Screen name="Attendance" component={StudentAttendance} />
     <Tab.Screen name="AI Tutor" component={StudentAITutor} />
+    <Tab.Screen name="Alerts" component={StudentNotifications} />
     <Tab.Screen name="Profile" component={StudentProfile} />
   </Tab.Navigator>
 );
 
 // ── Teacher Tabs ──────────────────────────────────────────────────
-
 const TeacherTabs = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({

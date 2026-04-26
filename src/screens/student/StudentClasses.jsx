@@ -2,12 +2,13 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl, ActivityIndicator,
-  Modal, Alert,
+  Modal, Alert, TextInput,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../api/axios';
 import { COLORS } from '../../utils/constants';
+import { notify } from '../../utils/notifications';
 
 // ── Course Work Modal ─────────────────────────────────────────────
 const CourseWorkModal = ({ cls, onClose }) => {
@@ -26,7 +27,6 @@ const CourseWorkModal = ({ cls, onClose }) => {
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
       <View style={cwStyles.container}>
-        {/* Header */}
         <View style={cwStyles.header}>
           <View>
             <Text style={cwStyles.title}>Course Work</Text>
@@ -36,7 +36,6 @@ const CourseWorkModal = ({ cls, onClose }) => {
             <Ionicons name="close" size={24} color={COLORS.dark} />
           </TouchableOpacity>
         </View>
-
         <ScrollView style={cwStyles.scroll}>
           {isLoading ? (
             <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
@@ -57,16 +56,10 @@ const CourseWorkModal = ({ cls, onClose }) => {
                     </View>
                     <View style={cwStyles.itemContent}>
                       <Text style={cwStyles.itemTitle}>{item.title}</Text>
-                      {item.description && (
-                        <Text style={cwStyles.itemDesc}>{item.description}</Text>
-                      )}
+                      {item.description && <Text style={cwStyles.itemDesc}>{item.description}</Text>}
                       <View style={cwStyles.itemMeta}>
-                        <Text style={[cwStyles.itemType, { color: config.color }]}>
-                          {item.type}
-                        </Text>
-                        <Text style={cwStyles.itemDate}>
-                          {new Date(item.createdAt).toLocaleDateString()}
-                        </Text>
+                        <Text style={[cwStyles.itemType, { color: config.color }]}>{item.type}</Text>
+                        <Text style={cwStyles.itemDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
                       </View>
                     </View>
                   </View>
@@ -90,26 +83,15 @@ const cwStyles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '800', color: COLORS.dark },
   subtitle: { fontSize: 13, color: COLORS.gray, marginTop: 2 },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center',
-  },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 16, fontWeight: '700', color: COLORS.dark, marginBottom: 4 },
   emptySubText: { fontSize: 13, color: COLORS.gray, textAlign: 'center', paddingHorizontal: 32 },
   list: { padding: 16, gap: 12 },
-  item: {
-    flexDirection: 'row', gap: 12,
-    backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
-    elevation: 1, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4,
-  },
-  itemIcon: {
-    width: 44, height: 44, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
+  item: { flexDirection: 'row', gap: 12, backgroundColor: COLORS.white, borderRadius: 14, padding: 14, elevation: 1 },
+  itemIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   itemIconText: { fontSize: 22 },
   itemContent: { flex: 1 },
   itemTitle: { fontSize: 15, fontWeight: '700', color: COLORS.dark, marginBottom: 4 },
@@ -121,10 +103,55 @@ const cwStyles = StyleSheet.create({
 
 // ── Fee Payment Modal ─────────────────────────────────────────────
 const FeePaymentModal = ({ cls, onClose }) => {
+  const queryClient = useQueryClient();
   const [method, setMethod] = useState('cash');
   const [selectedMonth, setSelectedMonth] = useState('');
-  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Bank transfer fields
+  const [bankName, setBankName] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // Card fields — real payment portal
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [cvvFocused, setCVVFocused] = useState(false);
+
+  // Card helpers
+  const getCardType = (num) => {
+    const n = num.replace(/\s/g, '');
+    if (n.startsWith('4')) return 'VISA';
+    if (n.startsWith('5')) return 'MASTERCARD';
+    if (n.startsWith('3')) return 'AMEX';
+    return 'CARD';
+  };
+
+  const getCardColors = (num) => {
+    const n = num.replace(/\s/g, '');
+    if (n.startsWith('5')) return { bg: '#1a1a2e', accent: '#4a4a8a' };
+    if (n.startsWith('3')) return { bg: '#1B4332', accent: '#40916C' };
+    return { bg: '#0d6b7a', accent: '#00b8c8' };
+  };
+
+  const formatCardNumber = (text) => {
+    const digits = text.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  const formatExpiry = (text) => {
+    const digits = text.replace(/\D/g, '').slice(0, 4);
+    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  const getDisplayNumber = () => {
+    const digits = cardNumber.replace(/\s/g, '');
+    const padded = digits.padEnd(16, '•');
+    return padded.replace(/(.{4})/g, '$1 ').trim();
+  };
 
   const { data: myFees } = useQuery({
     queryKey: ['mobile-fees'],
@@ -155,28 +182,83 @@ const FeePaymentModal = ({ cls, onClose }) => {
   };
 
   const handleSubmit = async () => {
-    if (!selectedMonth) {
-      Alert.alert('Error', 'Please select a month to pay for');
-      return;
+    if (!selectedMonth) { Alert.alert('Error', 'Please select a month'); return; }
+
+    if (method === 'card') {
+      if (cardNumber.replace(/\s/g, '').length < 16) { Alert.alert('Error', 'Enter valid 16-digit card number'); return; }
+      if (!cardHolder.trim()) { Alert.alert('Error', 'Enter cardholder name'); return; }
+      if (cardExpiry.length < 5) { Alert.alert('Error', 'Enter expiry date MM/YY'); return; }
+      if (cardCVV.length < 3) { Alert.alert('Error', 'Enter 3-digit CVV'); return; }
     }
+
+    if (method === 'bank_transfer') {
+      if (!bankName.trim()) { Alert.alert('Error', 'Enter bank name'); return; }
+      if (!transactionRef.trim()) { Alert.alert('Error', 'Enter transaction reference'); return; }
+    }
+
     setLoading(true);
     try {
       const selectedFee = unpaidFees.find(f => f.month === selectedMonth);
-      const formData = new FormData();
-      formData.append('classId', cls._id);
-      formData.append('amount', cls.monthlyFee);
-      formData.append('method', method);
-      formData.append('month', selectedMonth);
-      if (selectedFee) formData.append('feeRecordId', selectedFee._id);
-      if (notes) formData.append('notes', notes);
 
-      await api.post('/payment-requests', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      if (method === 'cash') {
+        Alert.alert(
+          '📋 Cash Payment Info',
+          `Visit XenEdu counter with Rs. ${cls.monthlyFee?.toLocaleString()} cash.\n\nShow your Student ID barcode — cashier will scan it and payment updates automatically! ✅`,
+          [{ text: 'Got it!', onPress: onClose }]
+        );
+        setLoading(false);
+        return;
+      }
 
-      Alert.alert('Success! ✅', 'Payment request submitted! Admin will approve shortly.', [
-        { text: 'OK', onPress: onClose },
-      ]);
+      if (method === 'card') {
+        const formData = new FormData();
+        formData.append('classId', cls._id);
+        formData.append('amount', cls.monthlyFee);
+        formData.append('method', 'card');
+        formData.append('month', selectedMonth);
+        formData.append('cardHolder', cardHolder);
+        formData.append('cardLast4', cardNumber.replace(/\s/g, '').slice(-4));
+        formData.append('cardType', getCardType(cardNumber));
+        if (selectedFee) formData.append('feeRecordId', selectedFee._id);
+
+        await api.post('/payment-requests', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        queryClient.invalidateQueries(['mobile-fees']);
+        queryClient.invalidateQueries(['mobile-dashboard']);
+
+        Alert.alert(
+          '💳 Payment Submitted!',
+          `${getCardType(cardNumber)} •••• •••• •••• ${cardNumber.replace(/\s/g, '').slice(-4)}\nHolder: ${cardHolder.toUpperCase()}\nAmount: Rs. ${cls.monthlyFee?.toLocaleString()}\n\nAdmin will process shortly!`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+      }
+
+      if (method === 'bank_transfer') {
+        const formData = new FormData();
+        formData.append('classId', cls._id);
+        formData.append('amount', cls.monthlyFee);
+        formData.append('method', 'bank_transfer');
+        formData.append('month', selectedMonth);
+        formData.append('bankName', bankName);
+        formData.append('transactionRef', transactionRef);
+        if (notes) formData.append('notes', notes);
+        if (selectedFee) formData.append('feeRecordId', selectedFee._id);
+
+        await api.post('/payment-requests', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        queryClient.invalidateQueries(['mobile-fees']);
+        queryClient.invalidateQueries(['mobile-dashboard']);
+
+        Alert.alert(
+          '🏦 Transfer Submitted!',
+          `Bank: ${bankName}\nRef: ${transactionRef}\nAmount: Rs. ${cls.monthlyFee?.toLocaleString()}\n\nAdmin will verify and approve within 24 hours!`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+      }
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'Submission failed');
     } finally {
@@ -185,6 +267,14 @@ const FeePaymentModal = ({ cls, onClose }) => {
   };
 
   const months = generateMonths();
+  const cardColors = getCardColors(cardNumber);
+
+  const getSubmitLabel = () => {
+    if (!selectedMonth) return 'Select a month first';
+    if (method === 'cash') return '📍 View Counter Instructions';
+    if (method === 'card') return `💳 Pay Rs. ${cls.monthlyFee?.toLocaleString()} Now`;
+    return `🏦 Submit Bank Transfer`;
+  };
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
@@ -221,10 +311,7 @@ const FeePaymentModal = ({ cls, onClose }) => {
                 </Text>
                 <Text style={payStyles.monthFee}>Rs. {cls.monthlyFee?.toLocaleString()}</Text>
               </View>
-              <View style={[
-                payStyles.monthStatus,
-                m.isPaid ? payStyles.paidStatus : payStyles.unpaidStatus,
-              ]}>
+              <View style={[payStyles.monthStatus, m.isPaid ? payStyles.paidStatus : payStyles.unpaidStatus]}>
                 <Text style={[payStyles.monthStatusText, { color: m.isPaid ? '#10B981' : '#EF4444' }]}>
                   {m.isPaid ? '✓ Paid' : 'Unpaid'}
                 </Text>
@@ -238,7 +325,7 @@ const FeePaymentModal = ({ cls, onClose }) => {
             {[
               { key: 'cash', label: 'Cash', icon: '💵' },
               { key: 'card', label: 'Card', icon: '💳' },
-              { key: 'bank_transfer', label: 'Bank Transfer', icon: '🏦' },
+              { key: 'bank_transfer', label: 'Bank', icon: '🏦' },
             ].map(m => (
               <TouchableOpacity
                 key={m.key}
@@ -253,43 +340,250 @@ const FeePaymentModal = ({ cls, onClose }) => {
             ))}
           </View>
 
-          {/* Cash info */}
+          {/* ── CASH ── */}
           {method === 'cash' && (
             <View style={payStyles.infoBox}>
-              <Text style={payStyles.infoTitle}>💵 Pay at institute counter</Text>
-              <Text style={payStyles.infoText}>
-                Visit the institute with Rs. {cls.monthlyFee?.toLocaleString()} cash.
-                The cashier will scan your barcode and record the payment.
-              </Text>
+              <Text style={payStyles.infoTitle}>💵 How Cash Payment Works</Text>
+              {[
+                'Visit XenEdu institute counter',
+                'Show your Student ID barcode',
+                `Pay Rs. ${cls.monthlyFee?.toLocaleString()} cash to cashier`,
+                'Payment updates automatically in your profile! ✅',
+              ].map((step, i) => (
+                <View key={i} style={payStyles.stepRow}>
+                  <View style={payStyles.stepNum}><Text style={payStyles.stepNumText}>{i + 1}</Text></View>
+                  <Text style={payStyles.stepText}>{step}</Text>
+                </View>
+              ))}
+              <Text style={payStyles.infoNote}>📞 033-2242-2589</Text>
             </View>
           )}
 
-          {/* Bank transfer info */}
+          {/* ── CARD PAYMENT PORTAL ── */}
+          {method === 'card' && (
+            <View>
+              {/* Amount summary */}
+              <View style={cardStyles.amountBanner}>
+                <Text style={cardStyles.amountLabel}>Amount to Pay</Text>
+                <Text style={cardStyles.amountValue}>Rs. {cls.monthlyFee?.toLocaleString()}</Text>
+                <Text style={cardStyles.amountSub}>{cls.name} • {selectedMonth || 'Select month above'}</Text>
+              </View>
+
+              {/* Live card preview */}
+              <View style={[cardStyles.cardPreview, { backgroundColor: cardColors.bg }]}>
+                {/* CVV flip overlay */}
+                {cvvFocused ? (
+                  <View style={StyleSheet.absoluteFillObject}>
+                    <View style={cardStyles.cvvStripe} />
+                    <View style={cardStyles.cvvRow}>
+                      <Text style={cardStyles.cvvLabel}>CVV</Text>
+                      <View style={cardStyles.cvvBox}>
+                        <Text style={cardStyles.cvvBoxText}>{'•'.repeat(cardCVV.length || 3)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    {/* Top */}
+                    <View style={cardStyles.cardTop}>
+                      <View style={cardStyles.chipRow}>
+                        {[0, 1, 2, 3].map(i => (
+                          <View key={i} style={cardStyles.chipDot} />
+                        ))}
+                      </View>
+                      <Text style={cardStyles.cardTypeText}>{getCardType(cardNumber)}</Text>
+                    </View>
+
+                    {/* Number */}
+                    <Text style={cardStyles.cardNumberDisplay}>{getDisplayNumber()}</Text>
+
+                    {/* Bottom */}
+                    <View style={cardStyles.cardBottom}>
+                      <View>
+                        <Text style={cardStyles.cardFieldLabel}>CARD HOLDER</Text>
+                        <Text style={cardStyles.cardFieldValue}>
+                          {cardHolder.toUpperCase() || 'FULL NAME'}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={cardStyles.cardFieldLabel}>EXPIRES</Text>
+                        <Text style={cardStyles.cardFieldValue}>
+                          {cardExpiry || 'MM/YY'}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Card form */}
+              <View style={cardStyles.form}>
+                {/* Card number */}
+                <View>
+                  <Text style={cardStyles.fieldLabel}>Card Number</Text>
+                  <View style={cardStyles.inputRow}>
+                    <Ionicons name="card-outline" size={16} color={COLORS.gray} />
+                    <TextInput
+                      value={cardNumber}
+                      onChangeText={t => setCardNumber(formatCardNumber(t))}
+                      placeholder="1234 5678 9012 3456"
+                      placeholderTextColor={COLORS.gray}
+                      style={cardStyles.input}
+                      keyboardType="numeric"
+                      maxLength={19}
+                    />
+                  </View>
+                </View>
+
+                {/* Cardholder */}
+                <View>
+                  <Text style={cardStyles.fieldLabel}>Cardholder Name</Text>
+                  <View style={cardStyles.inputRow}>
+                    <Ionicons name="person-outline" size={16} color={COLORS.gray} />
+                    <TextInput
+                      value={cardHolder}
+                      onChangeText={setCardHolder}
+                      placeholder="John Silva"
+                      placeholderTextColor={COLORS.gray}
+                      style={cardStyles.input}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
+
+                {/* Expiry + CVV */}
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={cardStyles.fieldLabel}>Expiry Date</Text>
+                    <View style={cardStyles.inputRow}>
+                      <Ionicons name="calendar-outline" size={16} color={COLORS.gray} />
+                      <TextInput
+                        value={cardExpiry}
+                        onChangeText={t => setCardExpiry(formatExpiry(t))}
+                        placeholder="MM/YY"
+                        placeholderTextColor={COLORS.gray}
+                        style={cardStyles.input}
+                        keyboardType="numeric"
+                        maxLength={5}
+                      />
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={cardStyles.fieldLabel}>CVV</Text>
+                    <View style={[cardStyles.inputRow, cvvFocused && { borderColor: COLORS.primary, borderWidth: 2 }]}>
+                      <Ionicons name="lock-closed-outline" size={16} color={COLORS.gray} />
+                      <TextInput
+                        value={cardCVV}
+                        onChangeText={t => setCardCVV(t.replace(/\D/g, '').slice(0, 3))}
+                        placeholder="•••"
+                        placeholderTextColor={COLORS.gray}
+                        style={cardStyles.input}
+                        keyboardType="numeric"
+                        maxLength={3}
+                        secureTextEntry
+                        onFocus={() => setCVVFocused(true)}
+                        onBlur={() => setCVVFocused(false)}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Security badge */}
+                <View style={cardStyles.securityBadge}>
+                  <Ionicons name="shield-checkmark" size={15} color="#10B981" />
+                  <Text style={cardStyles.securityText}>
+                    256-bit SSL encrypted. Your card details are secure.
+                  </Text>
+                </View>
+
+                {/* Accepted cards */}
+                <View style={cardStyles.acceptedRow}>
+                  <Text style={cardStyles.acceptedLabel}>Accepted:</Text>
+                  {['VISA', 'MASTERCARD', 'AMEX'].map(card => (
+                    <View key={card} style={[
+                      cardStyles.cardBadge,
+                      getCardType(cardNumber) === card && cardStyles.cardBadgeActive
+                    ]}>
+                      <Text style={[
+                        cardStyles.cardBadgeText,
+                        getCardType(cardNumber) === card && cardStyles.cardBadgeTextActive
+                      ]}>{card}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* ── BANK TRANSFER ── */}
           {method === 'bank_transfer' && (
             <View style={payStyles.infoBox}>
-              <Text style={payStyles.infoTitle}>🏦 XenEdu Bank Details</Text>
-              <Text style={payStyles.infoText}>Bank: Bank of Ceylon</Text>
-              <Text style={payStyles.infoText}>Account: 1234-5678-9012</Text>
-              <Text style={payStyles.infoText}>Branch: Mirigama</Text>
-              <Text style={payStyles.infoText}>Name: XenEdu Institute</Text>
+              <Text style={payStyles.infoTitle}>🏦 Bank Transfer Details</Text>
+
+              {/* XenEdu bank info */}
+              <View style={payStyles.bankDetails}>
+                <Text style={payStyles.bankDetailRow}>🏦 Bank of Ceylon</Text>
+                <Text style={payStyles.bankDetailRow}>🔢 Account: 1234-5678-9012</Text>
+                <Text style={payStyles.bankDetailRow}>🏢 Branch: Mirigama</Text>
+                <Text style={payStyles.bankDetailRow}>👤 XenEdu Institute</Text>
+                <Text style={[payStyles.bankDetailRow, { color: COLORS.primary, fontWeight: '700', marginTop: 4 }]}>
+                  💰 Amount: Rs. {cls.monthlyFee?.toLocaleString()}
+                </Text>
+              </View>
+
+              <Text style={payStyles.fieldLabel}>Your Bank Name *</Text>
+              <TextInput
+                value={bankName}
+                onChangeText={setBankName}
+                placeholder="e.g. Bank of Ceylon, Sampath Bank..."
+                placeholderTextColor={COLORS.gray}
+                style={payStyles.textInput}
+                autoCapitalize="words"
+              />
+
+              <Text style={payStyles.fieldLabel}>Transaction Reference Number *</Text>
+              <TextInput
+                value={transactionRef}
+                onChangeText={setTransactionRef}
+                placeholder="e.g. TXN123456789"
+                placeholderTextColor={COLORS.gray}
+                style={payStyles.textInput}
+                autoCapitalize="characters"
+              />
+
+              <Text style={payStyles.fieldLabel}>Additional Notes (Optional)</Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Any additional info..."
+                placeholderTextColor={COLORS.gray}
+                style={[payStyles.textInput, { minHeight: 70, textAlignVertical: 'top' }]}
+                multiline
+              />
+
+              <View style={payStyles.cardNote}>
+                <Ionicons name="information-circle" size={14} color={COLORS.primary} />
+                <Text style={payStyles.cardNoteText}>
+                  Admin will verify your transfer and approve within 24 hours.
+                </Text>
+              </View>
             </View>
           )}
 
-          {/* Submit button */}
+          {/* Submit */}
           <TouchableOpacity
-            style={[payStyles.submitBtn, (!selectedMonth || loading) && payStyles.submitBtnDisabled]}
+            style={[
+              payStyles.submitBtn,
+              (!selectedMonth || loading) && payStyles.submitBtnDisabled,
+              method === 'card' && selectedMonth && { backgroundColor: cardColors.bg },
+            ]}
             onPress={handleSubmit}
             disabled={!selectedMonth || loading}
           >
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={payStyles.submitBtnText}>
-                {!selectedMonth
-                  ? 'Select a month first'
-                  : `Submit Payment — Rs. ${cls.monthlyFee?.toLocaleString()} (${selectedMonth})`
-                }
-              </Text>
+              <Text style={payStyles.submitBtnText}>{getSubmitLabel()}</Text>
             )}
           </TouchableOpacity>
 
@@ -309,10 +603,7 @@ const payStyles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '800', color: COLORS.dark },
   subtitle: { fontSize: 13, color: COLORS.gray, marginTop: 2 },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center',
-  },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.dark, marginBottom: 10, marginTop: 16, textTransform: 'uppercase' },
@@ -342,14 +633,83 @@ const payStyles = StyleSheet.create({
     backgroundColor: '#F0FBF7', borderRadius: 12, padding: 14, marginTop: 12,
     borderWidth: 1, borderColor: '#C8EDE2',
   },
-  infoTitle: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginBottom: 6 },
-  infoText: { fontSize: 13, color: '#444', marginBottom: 2 },
-  submitBtn: {
-    backgroundColor: COLORS.primary, borderRadius: 14, padding: 16,
-    alignItems: 'center', marginTop: 20,
+  infoTitle: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginBottom: 12 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  stepNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { color: COLORS.white, fontWeight: '800', fontSize: 12 },
+  stepText: { fontSize: 13, color: COLORS.dark, flex: 1 },
+  infoNote: { fontSize: 12, color: COLORS.primary, fontWeight: '600', marginTop: 8 },
+  bankDetails: { backgroundColor: 'rgba(13,107,122,0.08)', borderRadius: 8, padding: 10, marginBottom: 12 },
+  bankDetailRow: { fontSize: 13, color: COLORS.dark, marginBottom: 4, fontWeight: '500' },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: COLORS.dark, marginBottom: 6, marginTop: 10, textTransform: 'uppercase' },
+  textInput: {
+    backgroundColor: COLORS.white, borderRadius: 10, padding: 12,
+    fontSize: 14, color: COLORS.dark, borderWidth: 1.5, borderColor: '#C8EDE2',
   },
+  cardNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10 },
+  cardNoteText: { fontSize: 12, color: COLORS.primary, flex: 1, lineHeight: 18 },
+  submitBtn: { backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
   submitBtnDisabled: { backgroundColor: COLORS.gray },
-  submitBtnText: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
+  submitBtnText: { color: COLORS.white, fontSize: 15, fontWeight: '700', textAlign: 'center' },
+});
+
+const cardStyles = StyleSheet.create({
+  amountBanner: {
+    backgroundColor: COLORS.white, borderRadius: 14, padding: 16,
+    alignItems: 'center', marginTop: 12, borderWidth: 1.5, borderColor: COLORS.primary,
+  },
+  amountLabel: { fontSize: 12, color: COLORS.gray, fontWeight: '600', marginBottom: 4 },
+  amountValue: { fontSize: 28, fontWeight: '800', color: COLORS.primary },
+  amountSub: { fontSize: 12, color: COLORS.gray, marginTop: 4 },
+  cardPreview: {
+    borderRadius: 18, padding: 22, marginTop: 16, marginBottom: 4,
+    minHeight: 190, justifyContent: 'space-between',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 16, elevation: 10,
+    overflow: 'hidden',
+  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  chipRow: { flexDirection: 'row', gap: 5 },
+  chipDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.45)' },
+  cardTypeText: { fontSize: 15, fontWeight: '800', color: COLORS.white, letterSpacing: 2 },
+  cardNumberDisplay: {
+    fontSize: 20, fontWeight: '600', color: COLORS.white,
+    letterSpacing: 3, marginVertical: 16,
+  },
+  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  cardFieldLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', letterSpacing: 1, marginBottom: 3 },
+  cardFieldValue: { fontSize: 13, fontWeight: '700', color: COLORS.white, letterSpacing: 1 },
+  cvvStripe: { height: 48, backgroundColor: 'rgba(0,0,0,0.6)', marginTop: 28, marginBottom: 16 },
+  cvvRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12 },
+  cvvLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '700' },
+  cvvBox: {
+    flex: 1, backgroundColor: COLORS.white,
+    borderRadius: 6, padding: 10, alignItems: 'center',
+  },
+  cvvBoxText: { fontSize: 18, fontWeight: '800', color: COLORS.dark, letterSpacing: 6 },
+  form: { gap: 12, marginTop: 12 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: COLORS.gray, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 13,
+    borderWidth: 1.5, borderColor: '#E0E0E0',
+  },
+  input: { flex: 1, fontSize: 15, color: COLORS.dark },
+  securityBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0FBF7', borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: '#C8EDE2',
+  },
+  securityText: { fontSize: 12, color: '#10B981', flex: 1 },
+  acceptedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  acceptedLabel: { fontSize: 12, color: COLORS.gray, fontWeight: '600' },
+  cardBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6,
+    backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#E0E0E0',
+  },
+  cardBadgeActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  cardBadgeText: { fontSize: 11, fontWeight: '800', color: COLORS.gray },
+  cardBadgeTextActive: { color: COLORS.white },
 });
 
 // ── Main Component ────────────────────────────────────────────────
@@ -377,14 +737,6 @@ const StudentClasses = () => {
     },
   });
 
-  const unenrollMutation = useMutation({
-    mutationFn: (classId) => api.delete(`/classes/${classId}/unenroll`),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['mobile-classes']);
-      queryClient.invalidateQueries(['mobile-dashboard']);
-    },
-  });
-
   const enrolledIds = dashboard?.enrolledClasses?.map(c => String(c.classId)) ?? [];
   const allClasses = classes?.classes ?? [];
   const enrolledClasses = allClasses.filter(c => enrolledIds.includes(String(c._id)));
@@ -393,23 +745,14 @@ const StudentClasses = () => {
 
   return (
     <View style={styles.container}>
-      {/* Course Work Modal */}
-      {selectedClass && (
-        <CourseWorkModal cls={selectedClass} onClose={() => setSelectedClass(null)} />
-      )}
+      {selectedClass && <CourseWorkModal cls={selectedClass} onClose={() => setSelectedClass(null)} />}
+      {payClass && <FeePaymentModal cls={payClass} onClose={() => setPayClass(null)} />}
 
-      {/* Fee Payment Modal */}
-      {payClass && (
-        <FeePaymentModal cls={payClass} onClose={() => setPayClass(null)} />
-      )}
-
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Classes</Text>
         <Text style={styles.headerSub}>Manage your enrolled classes</Text>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabRow}>
         {[
           { key: 'enrolled', label: `Enrolled (${enrolledClasses.length})` },
@@ -424,7 +767,6 @@ const StudentClasses = () => {
         ))}
       </View>
 
-      {/* Classes list */}
       <ScrollView
         style={styles.scroll}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
@@ -449,7 +791,6 @@ const StudentClasses = () => {
             const attData = dashboard?.enrolledClasses?.find(c => String(c.classId) === String(cls._id));
             return (
               <View key={i} style={[styles.classCard, isEnrolled && styles.classCardEnrolled]}>
-                {/* Class header */}
                 <View style={styles.classHeader}>
                   <View style={styles.classIconBox}>
                     <Text style={styles.classIconText}>📚</Text>
@@ -465,7 +806,6 @@ const StudentClasses = () => {
                   )}
                 </View>
 
-                {/* Class details */}
                 <View style={styles.classDetails}>
                   <View style={styles.detailRow}>
                     <Ionicons name="person-outline" size={14} color={COLORS.gray} />
@@ -487,7 +827,6 @@ const StudentClasses = () => {
                   </View>
                 </View>
 
-                {/* Attendance bar */}
                 {isEnrolled && attData && (
                   <View style={styles.attContainer}>
                     <View style={styles.attRow}>
@@ -508,21 +847,14 @@ const StudentClasses = () => {
                   </View>
                 )}
 
-                {/* Action buttons */}
                 <View style={styles.actionRow}>
                   {isEnrolled ? (
                     <>
-                      <TouchableOpacity
-                        style={styles.cwBtn}
-                        onPress={() => setSelectedClass(cls)}
-                      >
+                      <TouchableOpacity style={styles.cwBtn} onPress={() => setSelectedClass(cls)}>
                         <Ionicons name="book-outline" size={14} color={COLORS.primary} />
                         <Text style={styles.cwBtnText}>Course Work</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.payBtn}
-                        onPress={() => setPayClass(cls)}
-                      >
+                      <TouchableOpacity style={styles.payBtn} onPress={() => setPayClass(cls)}>
                         <Ionicons name="card-outline" size={14} color="white" />
                         <Text style={styles.payBtnText}>Pay Fee</Text>
                       </TouchableOpacity>
@@ -568,26 +900,15 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: COLORS.gray, fontWeight: '600' },
   browseBtn: { marginTop: 16, backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   browseBtnText: { color: COLORS.white, fontWeight: '700' },
-  classCard: {
-    backgroundColor: COLORS.white, borderRadius: 16, marginHorizontal: 16,
-    marginBottom: 12, padding: 16, elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8,
-  },
+  classCard: { backgroundColor: COLORS.white, borderRadius: 16, marginHorizontal: 16, marginBottom: 12, padding: 16, elevation: 2 },
   classCardEnrolled: { borderWidth: 2, borderColor: COLORS.primary },
   classHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  classIconBox: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#F0FBF7', alignItems: 'center', justifyContent: 'center', marginRight: 12,
-  },
+  classIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F0FBF7', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   classIconText: { fontSize: 22 },
   classInfo: { flex: 1 },
   className: { fontSize: 15, fontWeight: '700', color: COLORS.dark },
   classSubject: { fontSize: 12, color: COLORS.gray, marginTop: 2 },
-  enrolledBadge: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-  },
+  enrolledBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   enrolledBadgeText: { color: COLORS.white, fontWeight: '800', fontSize: 14 },
   classDetails: { gap: 6, marginBottom: 12 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -600,24 +921,12 @@ const styles = StyleSheet.create({
   attFill: { height: 6, borderRadius: 3 },
   attWarning: { fontSize: 11, color: '#EF4444', marginTop: 4, fontWeight: '600' },
   actionRow: { flexDirection: 'row', gap: 8 },
-  enrollBtn: {
-    flex: 1, backgroundColor: COLORS.primary, borderRadius: 10,
-    paddingVertical: 12, alignItems: 'center',
-  },
+  enrollBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   enrollBtnDisabled: { backgroundColor: COLORS.gray },
   enrollBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
-  cwBtn: {
-    flex: 1, backgroundColor: '#F0FBF7', borderRadius: 10,
-    paddingVertical: 12, alignItems: 'center', flexDirection: 'row',
-    justifyContent: 'center', gap: 4,
-    borderWidth: 1, borderColor: COLORS.primary,
-  },
+  cwBtn: { flex: 1, backgroundColor: '#F0FBF7', borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.primary },
   cwBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
-  payBtn: {
-    flex: 1, backgroundColor: COLORS.primary, borderRadius: 10,
-    paddingVertical: 12, alignItems: 'center', flexDirection: 'row',
-    justifyContent: 'center', gap: 4,
-  },
+  payBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
   payBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 13 },
 });
 

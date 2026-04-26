@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../api/axios';
 import { COLORS } from '../../utils/constants';
+import { notify } from '../../utils/notifications';
 
 const AdminFees = () => {
   const queryClient = useQueryClient();
@@ -27,9 +28,12 @@ const AdminFees = () => {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (id) => api.patch(`/payment-requests/${id}/approve`),
-    onSuccess: (res) => {
-      Alert.alert('Approved! ✅', `Receipt: ${res.data.receiptNumber}`);
+    mutationFn: (req) => api.patch(`/payment-requests/${req._id}/approve`),
+    onSuccess: (res, req) => {
+      const receiptNumber = res.data.receiptNumber;
+      Alert.alert('Approved! ✅', `Receipt: ${receiptNumber}`);
+      // Send notification
+      notify.paymentApproved(req.classId?.name || 'Class', req.amount, receiptNumber);
       queryClient.invalidateQueries(['admin-payment-requests']);
       queryClient.invalidateQueries(['admin-outstanding']);
     },
@@ -37,19 +41,15 @@ const AdminFees = () => {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, reason }) => api.patch(`/payment-requests/${id}/reject`, { reason }),
-    onSuccess: () => {
+    mutationFn: ({ id, reason, req }) => api.patch(`/payment-requests/${id}/reject`, { reason }),
+    onSuccess: (_, { reason, req }) => {
       Alert.alert('Rejected', 'Payment request rejected');
+      // Send notification
+      notify.paymentRejected(req?.classId?.name || 'Class', reason);
       queryClient.invalidateQueries(['admin-payment-requests']);
     },
     onError: err => Alert.alert('Error', err.response?.data?.message || 'Failed'),
   });
-
-  const statusColors = {
-    pending: 'bg-yellow-100',
-    approved: '#F0FBF7',
-    rejected: '#FEF2F2',
-  };
 
   return (
     <View style={styles.container}>
@@ -80,11 +80,9 @@ const AdminFees = () => {
         style={styles.scroll}
         refreshControl={<RefreshControl refreshing={false} onRefresh={activeTab === 'outstanding' ? refetchOutstanding : refetchRequests} />}
       >
-
         {/* Outstanding tab */}
         {activeTab === 'outstanding' && (
           <>
-            {/* Summary cards */}
             <View style={styles.summaryRow}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>Total Outstanding</Text>
@@ -137,7 +135,6 @@ const AdminFees = () => {
         {/* Payment requests tab */}
         {activeTab === 'requests' && (
           <>
-            {/* Filter */}
             <View style={styles.filterRow}>
               {['pending', 'approved', 'rejected'].map(f => (
                 <TouchableOpacity
@@ -194,10 +191,14 @@ const AdminFees = () => {
                     <View style={styles.reqActions}>
                       <TouchableOpacity
                         style={styles.approveBtn}
-                        onPress={() => Alert.alert('Approve', `Approve Rs. ${req.amount?.toLocaleString()} payment?`, [
-                          { text: 'Cancel' },
-                          { text: 'Approve', onPress: () => approveMutation.mutate(req._id) },
-                        ])}
+                        onPress={() => Alert.alert(
+                          'Approve Payment',
+                          `Approve Rs. ${req.amount?.toLocaleString()} from ${req.studentId?.userId?.name}?`,
+                          [
+                            { text: 'Cancel' },
+                            { text: 'Approve', onPress: () => approveMutation.mutate(req) },
+                          ]
+                        )}
                         disabled={approveMutation.isPending}
                       >
                         <Ionicons name="checkmark" size={16} color={COLORS.white} />
@@ -209,7 +210,9 @@ const AdminFees = () => {
                           Alert.prompt(
                             'Reject Payment',
                             'Enter rejection reason:',
-                            (reason) => { if (reason) rejectMutation.mutate({ id: req._id, reason }); }
+                            (reason) => {
+                              if (reason) rejectMutation.mutate({ id: req._id, reason, req });
+                            }
                           );
                         }}
                         disabled={rejectMutation.isPending}
@@ -250,10 +253,7 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#1a1a2e', fontWeight: '800' },
   scroll: { flex: 1, backgroundColor: '#F5F5F5', borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: 16, paddingTop: 16 },
   summaryRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 12 },
-  summaryCard: {
-    flex: 1, backgroundColor: COLORS.white, borderRadius: 14, padding: 14,
-    elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
-  },
+  summaryCard: { flex: 1, backgroundColor: COLORS.white, borderRadius: 14, padding: 14, elevation: 2 },
   summaryLabel: { fontSize: 12, color: COLORS.gray, fontWeight: '600', marginBottom: 4 },
   summaryValue: { fontSize: 20, fontWeight: '800' },
   filterRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 12 },
@@ -264,10 +264,7 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', paddingTop: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 15, color: COLORS.gray, fontWeight: '600' },
-  feeCard: {
-    backgroundColor: COLORS.white, borderRadius: 14, marginHorizontal: 16,
-    marginBottom: 8, padding: 14, elevation: 1,
-  },
+  feeCard: { backgroundColor: COLORS.white, borderRadius: 14, marginHorizontal: 16, marginBottom: 8, padding: 14, elevation: 1 },
   feeHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feeAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   feeAvatarText: { fontSize: 16, fontWeight: '800', color: COLORS.gold },
@@ -278,10 +275,7 @@ const styles = StyleSheet.create({
   feeAmount: { fontSize: 15, fontWeight: '800', color: COLORS.dark },
   feeBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
   feeBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
-  reqCard: {
-    backgroundColor: COLORS.white, borderRadius: 14, marginHorizontal: 16,
-    marginBottom: 10, padding: 14, elevation: 1,
-  },
+  reqCard: { backgroundColor: COLORS.white, borderRadius: 14, marginHorizontal: 16, marginBottom: 10, padding: 14, elevation: 1 },
   reqHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   reqAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   reqAvatarText: { fontSize: 16, fontWeight: '800', color: COLORS.gold },
