@@ -17,6 +17,7 @@ import TeacherDashboard from '../screens/teacher/TeacherDashboard';
 import TeacherAttendance from '../screens/teacher/TeacherAttendance';
 import ParentDashboard from '../screens/parent/ParentDashboard';
 import StudentAttendance from '../screens/student/StudentAttendance';
+import TeacherCourseWork from '../screens/teacher/TeacherCourseWork';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -79,12 +80,14 @@ const TeacherTabs = () => (
         let iconName;
         if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
         else if (route.name === 'Attendance') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
+        else if (route.name === 'Course Work') iconName = focused ? 'folder' : 'folder-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
     })}
   >
     <Tab.Screen name="Dashboard" component={TeacherDashboard} />
     <Tab.Screen name="Attendance" component={TeacherAttendance} />
+    <Tab.Screen name="Course Work" component={TeacherCourseWork} />
   </Tab.Navigator>
 );
 
