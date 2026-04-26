@@ -18,6 +18,12 @@ import TeacherAttendance from '../screens/teacher/TeacherAttendance';
 import ParentDashboard from '../screens/parent/ParentDashboard';
 import StudentAttendance from '../screens/student/StudentAttendance';
 import TeacherCourseWork from '../screens/teacher/TeacherCourseWork';
+import AdminDashboard from '../screens/admin/AdminDashboard';
+import AdminStudents from '../screens/admin/AdminStudents';
+import AdminFees from '../screens/admin/AdminFees';
+import AdminClasses from '../screens/admin/AdminClasses';
+import AdminReports from '../screens/admin/AdminReports';
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -94,23 +100,34 @@ const TeacherTabs = () => (
 // ── Admin Tabs ────────────────────────────────────────────────────
 const AdminTabs = () => (
   <Tab.Navigator
-    screenOptions={{
+    screenOptions={({ route }) => ({
       headerShown: false,
       tabBarActiveTintColor: COLORS.gold,
-      tabBarInactiveTintColor: COLORS.gray,
+      tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
       tabBarStyle: {
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#1a1a2e',
         borderTopWidth: 0,
         paddingBottom: 8,
         paddingTop: 8,
         height: 64,
       },
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-    }}
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+      tabBarIcon: ({ focused, color, size }) => {
+        let iconName;
+        if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
+        else if (route.name === 'Students') iconName = focused ? 'people' : 'people-outline';
+        else if (route.name === 'Classes') iconName = focused ? 'book' : 'book-outline';
+        else if (route.name === 'Fees') iconName = focused ? 'card' : 'card-outline';
+        else if (route.name === 'Reports') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+        return <Ionicons name={iconName} size={size} color={color} />;
+      },
+    })}
   >
-    <Tab.Screen name="Dashboard" component={StudentDashboard}
-      options={{ tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} /> }}
-    />
+    <Tab.Screen name="Dashboard" component={AdminDashboard} />
+    <Tab.Screen name="Students" component={AdminStudents} />
+    <Tab.Screen name="Classes" component={AdminClasses} />
+    <Tab.Screen name="Fees" component={AdminFees} />
+    <Tab.Screen name="Reports" component={AdminReports} />
   </Tab.Navigator>
 );
 
