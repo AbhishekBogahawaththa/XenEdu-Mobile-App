@@ -150,11 +150,38 @@ const AdminStudents = () => {
   const [search, setSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('students');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-students'],
     queryFn: () => api.get('/students').then(r => r.data),
   });
+
+  const { data: pendingData, refetch: refetchPending } = useQuery({
+    queryKey: ['admin-pending-students'],
+    queryFn: () => api.get('/students/pending').then(r => r.data),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id) => api.patch(/students//approve),
+    onSuccess: () => {
+      Alert.alert('Approved!', 'Student has been approved and can now login.');
+      queryClient.invalidateQueries(['admin-pending-students']);
+      queryClient.invalidateQueries(['admin-students']);
+    },
+    onError: err => Alert.alert('Error', err.response?.data?.message || 'Failed'),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id) => api.delete(/students//reject),
+    onSuccess: () => {
+      Alert.alert('Rejected', 'Registration has been rejected and removed.');
+      queryClient.invalidateQueries(['admin-pending-students']);
+    },
+    onError: err => Alert.alert('Error', err.response?.data?.message || 'Failed'),
+  });
+
+  const pendingStudents = pendingData?.students || [];
 
   const students = data?.students || [];
   const filtered = students.filter(s => {
@@ -171,9 +198,27 @@ const AdminStudents = () => {
       )}
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Students</Text>
-        <Text style={styles.headerSub}>{students.length} total students</Text>
-      </View>
+          <Text style={styles.headerTitle}>Students</Text>
+          <Text style={styles.headerSub}>{students.length} total students</Text>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'students' && styles.tabActive]}
+            onPress={() => setActiveTab('students')}
+          >
+            <Text style={[styles.tabText, activeTab === 'students' && styles.tabTextActive]}>All Students</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'pending' && styles.tabActive]}
+            onPress={() => setActiveTab('pending')}
+          >
+            <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>
+              Pending {pendingStudents.length > 0 ? `(${pendingStudents.length})` : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       <ScrollView style={styles.scroll} refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}>
 
@@ -199,7 +244,7 @@ const AdminStudents = () => {
 
           {/* Filter */}
           <View style={styles.filterRow}>
-            {['all', 'active', 'suspended', 'inactive'].map(f => (
+            {['all', 'pending', 'active', 'suspended', 'inactive'].map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
@@ -217,6 +262,52 @@ const AdminStudents = () => {
         <View style={styles.resultRow}>
           <Text style={styles.resultText}>Showing {filtered.length} students</Text>
         </View>
+
+        {/* Pending students */}
+        {activeTab === 'pending' && (
+          pendingStudents.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" style={{ marginBottom: 12 }} />
+              <Text style={styles.emptyText}>No pending registrations</Text>
+            </View>
+          ) : pendingStudents.map((student, i) => (
+            <View key={i} style={styles.pendingCard}>
+              <View style={styles.pendingHeader}>
+                <View style={[styles.studentAvatar, { backgroundColor: COLORS.primary }]}>
+                  <Text style={styles.studentAvatarText}>{student.userId?.name?.charAt(0)}</Text>
+                </View>
+                <View style={styles.studentInfo}>
+                  <Text style={styles.studentName}>{student.userId?.name}</Text>
+                  <Text style={styles.studentDetail}>{student.userId?.email}</Text>
+                  <Text style={styles.studentDetail}>{student.grade} • {student.stream} • {student.medium}</Text>
+                  <Text style={styles.studentDetail}>{student.school}</Text>
+                </View>
+              </View>
+              <View style={styles.pendingActions}>
+                <TouchableOpacity
+                  style={styles.approveBtn}
+                  onPress={() => Alert.alert('Approve Student', `Approve ${student.userId?.name}?`, [
+                    { text: 'Cancel' },
+                    { text: 'Approve', onPress: () => approveMutation.mutate(student._id) },
+                  ])}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#10B981" />
+                  <Text style={styles.approveBtnText}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.rejectBtn}
+                  onPress={() => Alert.alert('Reject Registration', `Reject and delete ${student.userId?.name}'s registration?`, [
+                    { text: 'Cancel' },
+                    { text: 'Reject', style: 'destructive', onPress: () => rejectMutation.mutate(student._id) },
+                  ])}
+                >
+                  <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
+                  <Text style={styles.rejectBtnText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
 
         {/* Students list */}
         {isLoading ? (
@@ -304,6 +395,18 @@ const styles = StyleSheet.create({
   studentRight: { alignItems: 'flex-end' },
   statusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  tabRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 0, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 4 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+  tabActive: { backgroundColor: COLORS.white },
+  tabText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
+  tabTextActive: { color: COLORS.primary },
+  pendingCard: { backgroundColor: COLORS.white, borderRadius: 14, marginHorizontal: 16, marginBottom: 8, padding: 14, elevation: 2, borderWidth: 1.5, borderColor: '#FDE68A' },
+  pendingHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  pendingActions: { flexDirection: 'row', gap: 8 },
+  approveBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F0FBF7', borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: '#10B981' },
+  approveBtnText: { color: '#10B981', fontWeight: '700', fontSize: 13 },
+  rejectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: '#EF4444' },
+  rejectBtnText: { color: '#EF4444', fontWeight: '700', fontSize: 13 },
 });
 
 export default AdminStudents;

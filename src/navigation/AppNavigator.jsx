@@ -24,6 +24,12 @@ import AdminStudents from '../screens/admin/AdminStudents';
 import AdminFees from '../screens/admin/AdminFees';
 import AdminClasses from '../screens/admin/AdminClasses';
 import AdminReports from '../screens/admin/AdminReports';
+import AdminScanPay from '../screens/admin/AdminScanPay';
+import LandingScreen from '../screens/auth/LandingScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import AdminTeachers from '../screens/admin/AdminTeachers';
+import AdminRegistrations from '../screens/admin/AdminRegistrations';
+import AdminAttendance from '../screens/admin/AdminAttendance';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,7 +57,6 @@ const StudentTabs = () => (
         else if (route.name === 'My ID') iconName = focused ? 'qr-code' : 'qr-code-outline';
         else if (route.name === 'Attendance') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
         else if (route.name === 'AI Tutor') iconName = focused ? 'sparkles' : 'sparkles-outline';
-        else if (route.name === 'Alerts') iconName = focused ? 'notifications' : 'notifications-outline';
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
@@ -62,7 +67,6 @@ const StudentTabs = () => (
     <Tab.Screen name="My ID" component={StudentQRCode} />
     <Tab.Screen name="Attendance" component={StudentAttendance} />
     <Tab.Screen name="AI Tutor" component={StudentAITutor} />
-    <Tab.Screen name="Alerts" component={StudentNotifications} />
     <Tab.Screen name="Profile" component={StudentProfile} />
   </Tab.Navigator>
 );
@@ -112,14 +116,18 @@ const AdminTabs = () => (
         paddingTop: 8,
         height: 64,
       },
-      tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+      tabBarLabelStyle: { fontSize: 9, fontWeight: '600' },
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
         if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
         else if (route.name === 'Students') iconName = focused ? 'people' : 'people-outline';
         else if (route.name === 'Classes') iconName = focused ? 'book' : 'book-outline';
         else if (route.name === 'Fees') iconName = focused ? 'card' : 'card-outline';
+        else if (route.name === 'Scan & Pay') iconName = focused ? 'scan' : 'scan-outline';
         else if (route.name === 'Reports') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+        else if (route.name === 'Teachers') iconName = focused ? 'person' : 'person-outline';
+        else if (route.name === 'Registrations') iconName = focused ? 'document' : 'document-outline';
+        else if (route.name === 'Attendance') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
     })}
@@ -128,9 +136,13 @@ const AdminTabs = () => (
     <Tab.Screen name="Students" component={AdminStudents} />
     <Tab.Screen name="Classes" component={AdminClasses} />
     <Tab.Screen name="Fees" component={AdminFees} />
+    <Tab.Screen name="Scan & Pay" component={AdminScanPay} />
     <Tab.Screen name="Reports" component={AdminReports} />
-  </Tab.Navigator>
-);
+    <Tab.Screen name="Teachers" component={AdminTeachers} />
+    <Tab.Screen name="Registrations" component={AdminRegistrations} />
+    <Tab.Screen name="Attendance" component={AdminAttendance} />
+    </Tab.Navigator>
+  );
 
 // ── Parent Tabs ───────────────────────────────────────────────────
 const ParentTabs = () => (
@@ -162,7 +174,9 @@ const ParentTabs = () => (
 // ── Auth Stack ────────────────────────────────────────────────────
 const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Landing" component={LandingScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Register" component={RegisterScreen} />
   </Stack.Navigator>
 );
 

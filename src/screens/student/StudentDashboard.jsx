@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, RefreshControl,
+  TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
@@ -13,6 +14,7 @@ import { notify } from '../../utils/notifications';
 
 const StudentDashboard = () => {
   const { user, logout } = useAuthStore();
+  const navigation = useNavigation();
   const [dashboard, setDashboard] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [notified, setNotified] = useState(false);
@@ -24,13 +26,11 @@ const StudentDashboard = () => {
 
   const dashData = data || dashboard;
 
-  // Trigger notifications once when data loads
   useEffect(() => {
     if (data && !notified) {
       setDashboard(data);
       setNotified(true);
 
-      // Fee reminder notification
       if (data?.fees?.totalOutstanding > 0) {
         const unpaid = data?.fees?.unpaidFees;
         if (unpaid && unpaid.length > 0) {
@@ -38,7 +38,6 @@ const StudentDashboard = () => {
         }
       }
 
-      // Attendance alert for at-risk classes
       data?.enrolledClasses?.forEach(cls => {
         if (cls.atRisk) {
           notify.attendanceAlert(cls.className, parseInt(cls.percentage));
@@ -59,7 +58,7 @@ const StudentDashboard = () => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerGreeting}>Welcome back! 👋</Text>
+            <Text style={styles.headerGreeting}>Welcome back!</Text>
             <Text style={styles.headerName}>{user?.name}</Text>
             <Text style={styles.headerRole}>Student</Text>
           </View>
@@ -75,32 +74,44 @@ const StudentDashboard = () => {
           {/* Stats */}
           <View style={styles.statsRow}>
             {[
-              { label: 'Classes', value: dashData?.enrolledClasses?.length ?? 0, icon: 'book', color: '#3B82F6' },
-              { label: 'Attendance', value: `${dashData?.overallAttendance ?? 0}%`, icon: 'checkmark-circle', color: '#10B981' },
-              { label: 'Unpaid', value: `Rs.${dashData?.fees?.totalOutstanding ?? 0}`, icon: 'card', color: '#EF4444' },
+              { label: 'Classes', value: dashData?.enrolledClasses?.length ?? 0, icon: 'book', color: '#3B82F6', screen: 'Classes' },
+              { label: 'Attendance', value: `${dashData?.overallAttendance ?? 0}%`, icon: 'checkmark-circle', color: '#10B981', screen: 'Attendance' },
+              { label: 'Unpaid', value: `Rs.${dashData?.fees?.totalOutstanding ?? 0}`, icon: 'card', color: '#EF4444', screen: 'Classes' },
             ].map((stat, i) => (
-              <View key={i} style={styles.statCard}>
+              <TouchableOpacity key={i} style={styles.statCard} onPress={() => navigation.navigate(stat.screen)} activeOpacity={0.7}>
                 <View style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}>
                   <Ionicons name={stat.icon} size={22} color={stat.color} />
                 </View>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
           {/* My Classes */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My Classes</Text>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>My Classes</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Classes')}>
+                <Text style={styles.seeAll}>See All</Text>
+              </TouchableOpacity>
+            </View>
+
             {dashData?.enrolledClasses?.length === 0 && (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyText}>No classes enrolled yet</Text>
               </View>
             )}
+
             {dashData?.enrolledClasses?.map((cls, i) => (
-              <View key={i} style={styles.classCard}>
+              <TouchableOpacity
+                key={i}
+                style={styles.classCard}
+                onPress={() => navigation.navigate('Classes')}
+                activeOpacity={0.7}
+              >
                 <View style={styles.classIcon}>
-                  <Text style={styles.classIconText}>📚</Text>
+                  <Ionicons name="book-outline" size={22} color={COLORS.primary} />
                 </View>
                 <View style={styles.classInfo}>
                   <Text style={styles.className}>{cls.className}</Text>
@@ -116,7 +127,7 @@ const StudentDashboard = () => {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -134,7 +145,15 @@ const StudentDashboard = () => {
           )}
 
           {/* Logout */}
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={() =>
+              Alert.alert('Logout', 'Are you sure you want to logout?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Logout', style: 'destructive', onPress: logout },
+              ])
+            }
+          >
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
@@ -181,7 +200,9 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: '800', color: COLORS.dark, marginBottom: 2 },
   statLabel: { fontSize: 11, color: COLORS.gray, fontWeight: '600' },
   section: { paddingHorizontal: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.dark, marginBottom: 12 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.dark },
+  seeAll: { fontSize: 13, color: COLORS.primary, fontWeight: '700' },
   emptyCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 24, alignItems: 'center' },
   emptyText: { color: COLORS.gray, fontSize: 14 },
   classCard: {
@@ -194,7 +215,6 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 12,
     backgroundColor: '#F0FBF7', alignItems: 'center', justifyContent: 'center',
   },
-  classIconText: { fontSize: 22 },
   classInfo: { flex: 1 },
   className: { fontSize: 14, fontWeight: '700', color: COLORS.dark, marginBottom: 2 },
   classDetail: { fontSize: 12, color: COLORS.gray },

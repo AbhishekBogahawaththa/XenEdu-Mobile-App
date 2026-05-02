@@ -1,7 +1,7 @@
 ﻿import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.0.72:5001/api';
+const BASE_URL = 'https://xenedu-tuition-management-production.up.railway.app/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
