@@ -10,7 +10,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
 import { COLORS } from '../../utils/constants';
-import { savePushTokenToBackend } from '../../utils/notifications';
 
 // ── XE Logo Component ──────────────────────────────────────────────────────────
 export const XELogo = ({ size = 'md' }) => {
@@ -203,7 +202,6 @@ const LoginScreen = ({ navigation }) => {
     return;
   }
   setLoading(true);
-  let loginSuccess = false;
   try {
     const res = await api.post('/auth/login', { email, password });
     const { user, accessToken, refreshToken } = res.data;
@@ -211,15 +209,10 @@ const LoginScreen = ({ navigation }) => {
     await AsyncStorage.setItem('refreshToken', refreshToken);
     await AsyncStorage.setItem('user', JSON.stringify(user));
     setUser(user, accessToken);
-    loginSuccess = true;
   } catch (err) {
     Alert.alert('Login Failed', err.response?.data?.message || 'Invalid email or password');
   } finally {
     setLoading(false);
-  }
-  // Outside try/catch — cannot trigger Login Failed alert
-  if (loginSuccess) {
-    savePushTokenToBackend().catch(() => {});
   }
 };
 
