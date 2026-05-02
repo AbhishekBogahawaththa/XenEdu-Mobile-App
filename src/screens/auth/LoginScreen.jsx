@@ -198,25 +198,30 @@ const LoginScreen = ({ navigation }) => {
   const [showFAQ, setShowFAQ] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await api.post('/auth/login', { email, password });
-      const { user, accessToken, refreshToken } = res.data;
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      setUser(user, accessToken);
-      savePushTokenToBackend();
-    } catch (err) {
-      Alert.alert('Login Failed', err.response?.data?.message || 'Invalid email or password');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!email || !password) {
+    Alert.alert('Error', 'Please enter email and password');
+    return;
+  }
+  setLoading(true);
+  let loginSuccess = false;
+  try {
+    const res = await api.post('/auth/login', { email, password });
+    const { user, accessToken, refreshToken } = res.data;
+    await AsyncStorage.setItem('accessToken', accessToken);
+    await AsyncStorage.setItem('refreshToken', refreshToken);
+    await AsyncStorage.setItem('user', JSON.stringify(user));
+    setUser(user, accessToken);
+    loginSuccess = true;
+  } catch (err) {
+    Alert.alert('Login Failed', err.response?.data?.message || 'Invalid email or password');
+  } finally {
+    setLoading(false);
+  }
+  // Outside try/catch — cannot trigger Login Failed alert
+  if (loginSuccess) {
+    savePushTokenToBackend().catch(() => {});
+  }
+};
 
   return (
     <>
