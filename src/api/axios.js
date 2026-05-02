@@ -6,7 +6,7 @@ const BASE_URL = 'https://xenedu-tuition-management-production.up.railway.app/ap
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 10000,
+  timeout: 30000, // 30 seconds for Railway cold start
 });
 
 api.interceptors.request.use(async (config) => {

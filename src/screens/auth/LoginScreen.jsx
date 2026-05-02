@@ -11,7 +11,6 @@ import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
 import { COLORS } from '../../utils/constants';
 
-// ── XE Logo Component ──────────────────────────────────────────────────────────
 export const XELogo = ({ size = 'md' }) => {
   const sizes = {
     sm: { box: 48, radius: 14, xSize: 20, eSize: 17 },
@@ -42,7 +41,6 @@ const xeStyles = StyleSheet.create({
   e: { fontWeight: '900', color: COLORS.white, letterSpacing: -1 },
 });
 
-// ── FAQ Questions ──────────────────────────────────────────────────────────────
 const FAQ_QUESTIONS = [
   { id: 1, q: 'How do I get my login credentials?', icon: 'key-outline' },
   { id: 2, q: 'What is XenEdu?', icon: 'information-circle-outline' },
@@ -52,7 +50,6 @@ const FAQ_QUESTIONS = [
   { id: 6, q: 'How to contact admin?', icon: 'call-outline' },
 ];
 
-// ── FAQ Chat Modal ─────────────────────────────────────────────────────────────
 const FAQModal = ({ visible, onClose }) => {
   const [messages, setMessages] = useState([
     { id: 1, role: 'assistant', text: "Hi! I'm Zenya, XenEdu's assistant. How can I help you today?" },
@@ -105,13 +102,9 @@ const FAQModal = ({ visible, onClose }) => {
             <Ionicons name="close" size={24} color={COLORS.dark} />
           </TouchableOpacity>
         </View>
-
-        <ScrollView
-          ref={scrollRef}
-          style={faqStyles.messages}
+        <ScrollView ref={scrollRef} style={faqStyles.messages}
           contentContainerStyle={{ padding: 16 }}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-        >
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
           {messages.map(msg => (
             <View key={msg.id} style={[faqStyles.bubble, msg.role === 'user' ? faqStyles.userBubble : faqStyles.botBubble]}>
               <Text style={[faqStyles.bubbleText, msg.role === 'user' ? faqStyles.userText : faqStyles.botText]}>
@@ -133,22 +126,13 @@ const FAQModal = ({ visible, onClose }) => {
             </View>
           )}
         </ScrollView>
-
         <View style={faqStyles.inputRow}>
-          <TextInput
-            style={faqStyles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type your question..."
-            placeholderTextColor={COLORS.gray}
-            multiline
-            maxLength={200}
-          />
+          <TextInput style={faqStyles.input} value={input} onChangeText={setInput}
+            placeholder="Type your question..." placeholderTextColor={COLORS.gray}
+            multiline maxLength={200} />
           <TouchableOpacity
             style={[faqStyles.sendBtn, (!input.trim() || loading) && faqStyles.sendBtnDisabled]}
-            onPress={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
-          >
+            onPress={() => sendMessage(input)} disabled={!input.trim() || loading}>
             <Ionicons name="send" size={18} color={COLORS.white} />
           </TouchableOpacity>
         </View>
@@ -159,11 +143,7 @@ const FAQModal = ({ visible, onClose }) => {
 
 const faqStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 20, paddingTop: 56, backgroundColor: COLORS.white,
-    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 56, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   botAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   botAvatarText: { fontSize: 18, fontWeight: '800', color: COLORS.gold },
@@ -196,86 +176,70 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
 
+  // ✅ handleLogin is INSIDE the component
   const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('Error', 'Please enter email and password');
-    return;
-  }
-  setLoading(true);
-  try {
-    const res = await api.post('/auth/login', { email, password });
-    const { user, accessToken, refreshToken } = res.data;
-    await AsyncStorage.setItem('accessToken', accessToken);
-    await AsyncStorage.setItem('refreshToken', refreshToken);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
-    setUser(user, accessToken);
-  } catch (err) {
-    Alert.alert('Login Failed', err.response?.data?.message || 'Invalid email or password');
-  } finally {
-    setLoading(false);
-  }
-};
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      const { user, accessToken, refreshToken } = res.data;
+      try {
+        await AsyncStorage.setItem('accessToken', accessToken);
+        await AsyncStorage.setItem('refreshToken', refreshToken);
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+      } catch (storageErr) {
+        console.log('Storage error:', storageErr.message);
+      }
+      setUser(user, accessToken);
+    } catch (err) {
+      const msg = err.code === 'ECONNABORTED'
+        ? 'Connection timeout. Please try again.'
+        : err.response?.data?.message || 'Invalid email or password';
+      Alert.alert('Login Failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
       <FAQModal visible={showFAQ} onClose={() => setShowFAQ(false)} />
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-
-          {/* Logo */}
           <View style={styles.logoContainer}>
             <XELogo size="md" />
             <Text style={styles.logoName}>XenEdu</Text>
             <Text style={styles.logoSub}>Sri Lanka's Smart A/L Tuition System</Text>
           </View>
-
-          {/* Card */}
           <View style={styles.card}>
             <Text style={styles.title}>Sign In</Text>
             <Text style={styles.subtitle}>Welcome back! Enter your credentials</Text>
-
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email Address</Text>
               <View style={styles.inputRow}>
                 <Ionicons name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="your@email.com"
-                  placeholderTextColor={COLORS.gray}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <TextInput style={styles.input} value={email} onChangeText={setEmail}
+                  placeholder="your@email.com" placeholderTextColor={COLORS.gray}
+                  keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
               </View>
             </View>
-
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <View style={styles.inputRow}>
                 <Ionicons name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter password"
-                  placeholderTextColor={COLORS.gray}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <TextInput style={[styles.input, { flex: 1 }]} value={password} onChangeText={setPassword}
+                  placeholder="Enter password" placeholderTextColor={COLORS.gray}
+                  secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
                   <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={COLORS.gray} />
                 </TouchableOpacity>
               </View>
             </View>
-
-            <TouchableOpacity
-              style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
+            <TouchableOpacity style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
+              onPress={handleLogin} disabled={loading}>
               {loading ? <ActivityIndicator color="white" /> : (
                 <>
                   <Ionicons name="log-in-outline" size={20} color={COLORS.white} />
@@ -283,13 +247,11 @@ const LoginScreen = ({ navigation }) => {
                 </>
               )}
             </TouchableOpacity>
-
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>XenEdu Mirigama</Text>
               <View style={styles.dividerLine} />
             </View>
-
             <View style={styles.infoBox}>
               <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
               <Text style={styles.infoText}>
@@ -297,8 +259,6 @@ const LoginScreen = ({ navigation }) => {
               </Text>
             </View>
           </View>
-
-          {/* Register Button */}
           <TouchableOpacity style={styles.registerBtn} onPress={() => navigation.navigate('Register')}>
             <View style={styles.btnLeft}>
               <Ionicons name="person-add-outline" size={20} color={COLORS.gold} />
@@ -309,8 +269,6 @@ const LoginScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={16} color={COLORS.gold} />
             </View>
           </TouchableOpacity>
-
-          {/* FAQ Help Button */}
           <TouchableOpacity style={styles.helpBtn} onPress={() => setShowFAQ(true)}>
             <View style={styles.btnLeft}>
               <Ionicons name="help-circle-outline" size={20} color={COLORS.white} />
@@ -321,7 +279,6 @@ const LoginScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.6)" />
             </View>
           </TouchableOpacity>
-
           <Text style={styles.footer}>© 2026 XenEdu Mirigama. All rights reserved.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -335,10 +292,7 @@ const styles = StyleSheet.create({
   logoContainer: { alignItems: 'center', marginBottom: 32 },
   logoName: { fontSize: 34, fontWeight: '900', color: COLORS.white, marginTop: 14, marginBottom: 4, letterSpacing: 2 },
   logoSub: { fontSize: 13, color: 'rgba(255,255,255,0.65)', textAlign: 'center', letterSpacing: 0.5 },
-  card: {
-    width: '100%', backgroundColor: COLORS.white, borderRadius: 28, padding: 28,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 28, elevation: 12,
-  },
+  card: { width: '100%', backgroundColor: COLORS.white, borderRadius: 28, padding: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.2, shadowRadius: 28, elevation: 12 },
   title: { fontSize: 26, fontWeight: '800', color: COLORS.dark, marginBottom: 4 },
   subtitle: { fontSize: 14, color: COLORS.gray, marginBottom: 24 },
   inputGroup: { marginBottom: 16 },
@@ -347,11 +301,7 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 8 },
   input: { flex: 1, padding: 13, fontSize: 14, color: COLORS.dark },
   eyeBtn: { padding: 10 },
-  loginBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, marginTop: 8,
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
-  },
+  loginBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, marginTop: 8, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
   loginBtnDisabled: { opacity: 0.6 },
   loginBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 20 },
@@ -359,28 +309,13 @@ const styles = StyleSheet.create({
   dividerText: { fontSize: 12, color: COLORS.gray, fontWeight: '600' },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F0FBF7', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#C8EDE2' },
   infoText: { flex: 1, fontSize: 12, color: COLORS.primary, lineHeight: 18 },
-
-  // Register button — gold border
-  registerBtn: {
-    width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: 16, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: COLORS.gold,
-  },
+  registerBtn: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: COLORS.gold },
   registerBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.gold },
-
-  // Help button — subtle white border
-  helpBtn: {
-    width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: 10, backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-  },
+  helpBtn: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   helpBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-
-  // Shared left/right layouts
   btnLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   btnRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   btnSub: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
-
   footer: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 24 },
 });
 
