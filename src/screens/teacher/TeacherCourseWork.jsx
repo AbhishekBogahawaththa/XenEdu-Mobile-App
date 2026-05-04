@@ -49,7 +49,7 @@ const AddCourseWorkModal = ({ cls, onClose, onSuccess }) => {
       if (file) {
         formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' });
       }
-      await api.post('/coursework', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(`/coursework/${cls._id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       Alert.alert('Success! ✅', 'Uploaded successfully!', [{ text: 'OK', onPress: () => { onSuccess(); onClose(); } }]);
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'Upload failed');
