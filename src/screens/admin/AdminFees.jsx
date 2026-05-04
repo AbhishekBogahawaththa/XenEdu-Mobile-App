@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl, ActivityIndicator,
-  Alert,
+  Alert, Modal, TextInput,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,9 @@ const AdminFees = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('outstanding');
   const [filter, setFilter] = useState('pending');
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [selectedReq, setSelectedReq] = useState(null);
 
   const { data: outstanding, isLoading: loadingOutstanding, refetch: refetchOutstanding } = useQuery({
     queryKey: ['admin-outstanding'],
@@ -32,7 +35,6 @@ const AdminFees = () => {
     onSuccess: (res, req) => {
       const receiptNumber = res.data.receiptNumber;
       Alert.alert('Approved! ✅', `Receipt: ${receiptNumber}`);
-      // Send notification
       notify.paymentApproved(req.classId?.name || 'Class', req.amount, receiptNumber);
       queryClient.invalidateQueries(['admin-payment-requests']);
       queryClient.invalidateQueries(['admin-outstanding']);
@@ -41,10 +43,9 @@ const AdminFees = () => {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, reason, req }) => api.patch(`/payment-requests/${id}/reject`, { reason }),
+    mutationFn: ({ id, reason }) => api.patch(`/payment-requests/${id}/reject`, { reason }),
     onSuccess: (_, { reason, req }) => {
       Alert.alert('Rejected', 'Payment request rejected');
-      // Send notification
       notify.paymentRejected(req?.classId?.name || 'Class', reason);
       queryClient.invalidateQueries(['admin-payment-requests']);
     },
@@ -53,6 +54,49 @@ const AdminFees = () => {
 
   return (
     <View style={styles.container}>
+
+      {/* Reject Reason Modal */}
+      <Modal visible={showRejectModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: COLORS.white, borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: COLORS.dark, marginBottom: 4 }}>
+              Reject Payment
+            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.gray, marginBottom: 12 }}>
+              {selectedReq?.studentId?.userId?.name} • Rs. {selectedReq?.amount?.toLocaleString()}
+            </Text>
+            <TextInput
+              style={{ borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10, padding: 12, fontSize: 14, color: COLORS.dark, marginBottom: 16 }}
+              placeholder="Enter rejection reason..."
+              placeholderTextColor={COLORS.gray}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#F5F5F5', alignItems: 'center' }}
+                onPress={() => { setShowRejectModal(false); setRejectReason(''); setSelectedReq(null); }}
+              >
+                <Text style={{ fontWeight: '700', color: COLORS.gray }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center' }}
+                onPress={() => {
+                  if (!rejectReason.trim()) return Alert.alert('Error', 'Please enter a reason');
+                  rejectMutation.mutate({ id: selectedReq._id, reason: rejectReason, req: selectedReq });
+                  setShowRejectModal(false);
+                  setRejectReason('');
+                  setSelectedReq(null);
+                }}
+              >
+                <Text style={{ fontWeight: '700', color: '#EF4444' }}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Fees & Payments</Text>
         <Text style={styles.headerSub}>Manage student fee collection</Text>
@@ -204,16 +248,12 @@ const AdminFees = () => {
                         <Ionicons name="checkmark" size={16} color={COLORS.white} />
                         <Text style={styles.approveBtnText}>Approve</Text>
                       </TouchableOpacity>
+
                       <TouchableOpacity
                         style={styles.rejectBtn}
                         onPress={() => {
-                          Alert.prompt(
-                            'Reject Payment',
-                            'Enter rejection reason:',
-                            (reason) => {
-                              if (reason) rejectMutation.mutate({ id: req._id, reason, req });
-                            }
-                          );
+                          setSelectedReq(req);
+                          setShowRejectModal(true);
                         }}
                         disabled={rejectMutation.isPending}
                       >
@@ -256,7 +296,7 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, backgroundColor: COLORS.white, borderRadius: 14, padding: 14, elevation: 2 },
   summaryLabel: { fontSize: 12, color: COLORS.gray, fontWeight: '600', marginBottom: 4 },
   summaryValue: { fontSize: 20, fontWeight: '800' },
-  filterRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 12 },
+  filterRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 12, marginTop: 16 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white },
   filterChipActive: { backgroundColor: COLORS.primary },
   filterChipText: { fontSize: 13, fontWeight: '600', color: COLORS.gray, textTransform: 'capitalize' },
