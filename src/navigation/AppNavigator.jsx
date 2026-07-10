@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import useAuthStore from '../store/authStore';
 import { COLORS } from '../utils/constants';
-import { COLORS } from '../utils/constants';
+
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import StudentDashboard from '../screens/student/StudentDashboard';
